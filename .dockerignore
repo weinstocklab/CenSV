@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+.git
+.github
+infra
+etl
+docs
+shot_*.png
+shot_*.jpg
+*.md

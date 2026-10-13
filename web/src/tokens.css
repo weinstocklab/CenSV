@@ -1,0 +1,216 @@
+/* Design tokens for CenSV.
+ *
+ * The evidence ramp is a ONE-HUE ORDINAL ramp (orange), not a rainbow and not a
+ * yellow-to-red two-hue gradient. `n_layers` is a small integer count, so the ramp is
+ * stepped, not continuous.
+ *
+ * Both modes were validated with the dataviz validator rather than chosen by eye:
+ *
+ *   light  #efa070,#e07038,#b8501e,#8a3a10   --ordinal --mode light
+ *          monotone L PASS | adjacent dL >= 0.06 PASS | light end 2.06:1 PASS
+ *          | single hue, spread 9 deg PASS
+ *   dark   #f6bb92,#ef9a63,#e2743c,#c25520   --ordinal --mode dark
+ *          monotone L PASS | adjacent dL >= 0.06 PASS | dim end 3.83:1 PASS
+ *          | single hue, spread 13 deg PASS
+ *
+ * Dark mode is SELECTED, not an inversion: on light, more evidence reads darker; on
+ * dark, more evidence reads brighter. In both, magnitude means more contrast against
+ * the surface it sits on.
+ *
+ * An earlier 5-step attempt failed the 2:1 ordinal light-end floor (#f6b98c at 1.67:1),
+ * and two 5-step retunes failed the adjacent-lightness gate. 4 steps is also what the
+ * data supports: the maximum evidence count observed is 2, and 98.5% of SVs have none.
+ */
+
+.viz-root {
+  color-scheme: light;
+
+  --surface-1: #fcfcfb;
+  --page: #f9f9f7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  /* 4.68:1 on --surface-1 and 4.55:1 on --page. It was #898781, which is 3.50:1 and 3.41:1
+   * - below the 4.5:1 floor for text under 18.66 px, and this is the colour of .muted, every
+   * figcaption, every SVG label and every facet's haplotype count, in the theme every reader
+   * lands on. This is the LEAST darkening that clears the floor, because a page whose premise
+   * is that almost everything recedes cannot afford more than it has to. --text-secondary
+   * #52514e is 7.73:1, so the two stay distinct. The dark block keeps #898781, which is
+   * 4.85:1 there and passes. */
+  --text-muted: #75726b;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+
+  /* evidence ramp, 1..4+ converging layers */
+  --ev-1: #efa070;
+  --ev-2: #e07038;
+  --ev-3: #b8501e;
+  --ev-4: #8a3a10;
+  /* no evidence: recedes toward the surface, deliberately.
+   *
+   * The opacity is a token because the same 0.55 does not mean the same thing in both
+   * modes: a light grey at 0.55 over near-white stays a visible mark, while a dark grey at
+   * 0.55 over near-black washes into the background and the sense of catalog density is
+   * lost. Dark carries more of the colour it was given. */
+  --ev-0: #d8d7d0;
+  --ev-0-op: 0.55;
+
+  /* the alpha-satellite array band the SVs sit in */
+  --array-band: #eef1f4;
+  --array-edge: #d5dae0;
+
+  /* accent for selection and links, categorical slot 1.
+   * 4.67:1 on --page. It was #2a78d6 at 4.19:1, which is link text below the floor. Again
+   * the least change that clears it; the dark block's #3987e5 is 5.34:1 and passes. */
+  --accent: #2470cc;
+
+  /* The outlines of the second and third origins on the clade tree, each with a value per
+     theme. See the header of web/src/haplo.js for what they carry, and
+     web/tools/dev/origin_palette_search.mjs for the tool that says whether they may.
+
+     A SQUARE HARMONY ON --accent. The two hues sit 90 and 270 degrees from the blue that
+     origin 1 is already drawn in, so the three are a scheme rather than three colours that
+     happen not to collide. They were then moved the shortest distance that clears this
+     figure's own palette - at most 11.1 in OKLab distance x100, which keeps the scheme
+     recognisable. Measured: 28.3 apart in normal vision and 9.0 under the worst of three
+     simulated colour-vision deficiencies, against floors of 15 and 8; nothing closer than 15
+     to any ancestry hue, carrier step or the grid in either theme; and 3:1 against the
+     surface, which is what a one-pixel dashed outline needs to be seen at all.
+
+     ONE VALUE FOR BOTH THEMES was the rule until 2026-09-13, and it was the whole constraint
+     on the colour before it. A value legible on near-white AND on near-black sits at middle
+     lightness, where the six ancestry hues and the carrier ramp already are, so the only way
+     left to clear them was saturation: swept over every hue, exactly three hue bands passed
+     and all three were red. That is why the second origin was a vivid magenta for as long as
+     it was. A value per theme opens every hue family at a quarter of that chroma. */
+  --origin-2: #be2377;
+  --origin-3: #3a6740;
+
+  /* ancestry stack, bottom to top: AFR AMR EAS EUR SAS. (It read "... SAS unlabelled": the
+   * sixth was a sentinel for samples the panel join missed, and there are none - every one of
+   * the 188 now carries a superpopulation, which verify_shipped_data.py check 3 requires. The
+   * sixth hue below is kept because the palette was searched and validated as a set of six
+   * and re-searching five would be a change with nothing behind it.)
+   *
+   * A CATEGORICAL palette, the only one on this site, and the only place colour carries
+   * identity rather than magnitude. Six fills is near the accessible limit, so both the hues
+   * and their ORDER were searched rather than chosen (web/tools/find_stack_palette.mjs) and
+   * validated with the dataviz validator:
+   *
+   *   light  #009E73,#0072B2,#D55E00,#56B4E9,#E69F00,#CC79A7   --mode light
+   *          band PASS | chroma PASS | worst adjacent CVD dE 18.0 protan, 8.5 tritan
+   *          | normal-vision 18.7 PASS | contrast: 3 below 3:1, relief taken (see below)
+   *   dark   #009E73,#0072B2,#D55E00,#4899c7,#865b00,#c676a2   --mode dark
+   *          band PASS | chroma PASS | worst adjacent CVD dE 18.0 protan, 8.6 tritan
+   *          | normal-vision 18.7 PASS | contrast: 1 below 3:1, relief taken
+   *
+   * The order is doing real work. These same six hues in Okabe-Ito's published order give a
+   * worst adjacent pair of 7.6 dE - inside the 6-8 band that is legal only with secondary
+   * encoding. Permuting the assignment, which is free because the stack order is fixed by
+   * the strata, lifts it to 18.0. 720 of 720 orderings pass on light; only 216 of 720 on
+   * dark. Dark is not an inversion: it re-steps the three hues that sit above the dark
+   * band's L 0.67 ceiling and leaves the other three alone.
+   *
+   * The contrast relief is taken as the validator requires: every segment is named in the
+   * legend beside the track, every bar is separated by a surface-coloured gap, the stack
+   * order is fixed and stated, and a table view of the same numbers exists. */
+  --anc-1: #009E73;
+  --anc-2: #0072B2;
+  --anc-3: #D55E00;
+  --anc-4: #56B4E9;
+  --anc-5: #E69F00;
+  --anc-6: #CC79A7;
+
+}
+
+/* There was a `@media (prefers-color-scheme: dark)` block here, guarded by
+ * `:root:where(:not([data-theme="light"]))`. index.html ships `data-theme="light"` on the
+ * <html> element and the packed build reproduces it, so the guard could never hold and the
+ * 32 lines could never apply. Checked in a browser with the OS preference emulated as dark:
+ * matchMedia reported dark, --surface-1 stayed #fcfcfb, and one click of the theme button
+ * produced #1a1a19 - so the page sees the preference and the stylesheet ignored it.
+ *
+ * Deleted rather than repaired. Every reader and every screenshot opening on the same light
+ * palette is worth having for a figure-heavy page that goes to reviewers, and the gate in
+ * build_singlefile.py argues the same thing: it is light unconditionally so that half of
+ * readers do not watch it flash dark then light. Whether to follow the operating system is a
+ * decision, not an oversight - and it is not made by leaving unreachable CSS in the sheet.
+ */
+
+:root[data-theme="dark"] .viz-root {
+  color-scheme: dark;
+  --origin-2: #f0a9e1;
+  --origin-3: #90dbac;
+  --surface-1: #1a1a19;
+  --page: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+
+  --ev-1: #c25520;
+  --ev-2: #e2743c;
+  --ev-3: #ef9a63;
+  --ev-4: #f6bb92;
+  --ev-0: #3a3a37;
+  --ev-0-op: 0.85;
+
+  --array-band: #232326;
+  --array-edge: #33343a;
+
+  --anc-1: #009E73;
+  --anc-2: #0072B2;
+  --anc-3: #D55E00;
+  --anc-4: #4899c7;
+  --anc-5: #865b00;
+  --anc-6: #c676a2;
+
+  --accent: #3987e5;
+}
+
+/* ---------------------------------------------------------------------------------------
+ * Scale. Colour above is validated against the dataviz checks; everything below is
+ * layout, kept here so there is one place to change either.
+ *
+ * The type scale is a 1.2 ratio off a 15px base, rounded to whole pixels. Before this the
+ * sheet carried 12.3, 12.5, 13.2, 14.2 and 14.5px, which is not a scale - it is a series of
+ * one-off adjustments that no later change can stay consistent with.
+ */
+.viz-root {
+  --t-xs: 11px;
+  --t-sm: 12px;
+  --t-base: 13px;
+  --t-md: 15px;
+  --t-lg: 18px;
+  --t-xl: 22px;
+  --t-2xl: 27px;
+
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+
+  --r-sm: 5px;
+  --r-md: 8px;
+  --r-lg: 12px;
+
+  --shadow-1: 0 1px 2px rgba(16, 15, 12, .05);
+  --shadow-2: 0 4px 16px rgba(16, 15, 12, .10);
+  --shadow-3: -8px 0 32px rgba(16, 15, 12, .13);
+
+  --header-h: 56px;
+  --measure: 74ch;
+}
+
+/* One selector, matching the palette block above it. The second - the same
+   `:not([data-theme="light"])` guard - is gone with the media query it belonged to; outside
+   a media query it was live, and only the hardcoded attribute kept it from painting dark
+   shadows on the light theme. */
+:root[data-theme="dark"] .viz-root {
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .40);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, .50);
+  --shadow-3: -8px 0 32px rgba(0, 0, 0, .55);
+}

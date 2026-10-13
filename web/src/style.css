@@ -1,0 +1,705 @@
+@import "./tokens.css";
+
+/* =======================================================================================
+ * CenSV
+ *
+ * One column, one accent, one ramp. The page is mostly evidence-free catalog, so almost
+ * everything here recedes deliberately and the ramp is the only saturated colour on the
+ * page - a second accent would compete with the thing the site exists to show.
+ * ===================================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+html, body { height: 100%; }
+/* Column layout so a short page - an empty search result, say - still puts the footer at
+   the bottom instead of floating it halfway up. */
+body { display: flex; flex-direction: column; min-height: 100%; }
+/* width:100% is load-bearing. `margin: 0 auto` on a flex item overrides the default
+   stretch, which drops main to shrink-to-fit its max-content - and the card grid's
+   max-content is far wider than a phone, so the page overflowed horizontally. */
+main { flex: 1 0 auto; width: 100%; min-width: 0; }
+.foot { flex: none; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--text-primary);
+  font: var(--t-md)/1.55 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+
+code {
+  font: 0.92em/1.4 ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  background: var(--page); border: 1px solid var(--grid);
+  border-radius: var(--r-sm); padding: 0 4px;
+}
+
+h1, h2, h3 { margin: 0; font-weight: 640; letter-spacing: -0.02em; }
+h1 { font-size: var(--t-xl); }
+h2 { font-size: var(--t-lg); }
+
+::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+
+:where(a, button, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+.muted { color: var(--text-muted); font-size: var(--t-base); }
+.num { font-variant-numeric: tabular-nums; }
+mark { background: color-mix(in srgb, var(--ev-1) 45%, transparent); color: inherit; border-radius: 2px; }
+
+.eyebrow {
+  display: block; font-size: var(--t-xs); font-weight: 620; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text-muted);
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+.skip {
+  position: absolute; left: var(--s-3); top: -3em; z-index: 100;
+  background: var(--surface-1); border: 1px solid var(--accent);
+  padding: var(--s-2) var(--s-3); border-radius: var(--r-md); transition: top .12s;
+}
+.skip:focus { top: var(--s-3); }
+
+/* ---------------------------------------------------------------------------- header */
+.top {
+  position: sticky; top: 0; z-index: 30;
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  backdrop-filter: saturate(180%) blur(8px);
+  border-bottom: 1px solid var(--grid);
+}
+.topin {
+  max-width: 1240px; margin: 0 auto; padding: 0 var(--s-5);
+  min-height: var(--header-h);
+  display: flex; align-items: center; gap: var(--s-4);
+}
+
+.brand { display: flex; align-items: center; gap: var(--s-2); text-decoration: none; color: inherit; }
+.brand .mark {
+  width: 17px; height: 17px; border-radius: var(--r-sm); flex: none;
+  background: linear-gradient(135deg, var(--ev-1) 0%, var(--ev-2) 45%, var(--ev-4) 100%);
+}
+.brand .wordmark { display: flex; flex-direction: column; line-height: 1.15; }
+.brand b { font-size: var(--t-md); font-weight: 680; letter-spacing: -0.02em; }
+.brand .tagline { font-size: var(--t-xs); color: var(--text-muted); white-space: nowrap; }
+
+.searchmount { flex: 1; display: flex; justify-content: center; min-width: 0; }
+
+button.ghost {
+  font: inherit; font-size: var(--t-base); padding: 5px 11px; border-radius: var(--r-md);
+  cursor: pointer; border: 1px solid var(--grid); background: var(--surface-1);
+  color: var(--text-secondary); transition: border-color .12s, color .12s;
+}
+button.ghost:hover { border-color: var(--axis); color: var(--text-primary); }
+button.ghost.icon { padding: 5px 9px; font-size: var(--t-md); line-height: 1; }
+
+.crumbs {
+  max-width: 1240px; margin: 0 auto; padding: 0 var(--s-5) var(--s-2);
+  display: flex; align-items: center; gap: var(--s-2);
+  font-size: var(--t-base); color: var(--text-secondary);
+}
+.crumbs:empty { display: none; }
+.crumbs .sep { color: var(--text-muted); }
+
+/* ---------------------------------------------------------------------------- search */
+.qbox { position: relative; width: 100%; max-width: 560px; }
+.qicon {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-52%);
+  color: var(--text-muted); font-size: 15px; pointer-events: none;
+}
+.qinput {
+  width: 100%; font: inherit; font-size: var(--t-base);
+  padding: 7px 34px 7px 30px;
+  border: 1px solid var(--grid); border-radius: var(--r-md);
+  background: var(--page); color: var(--text-primary);
+  transition: border-color .12s, background .12s;
+}
+.qinput::placeholder { color: var(--text-muted); }
+.qinput:focus { background: var(--surface-1); border-color: var(--accent); outline: none; }
+.qinput::-webkit-search-cancel-button { display: none; }
+
+.qhint {
+  position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
+  font: 600 var(--t-xs)/1 ui-monospace, monospace; color: var(--text-muted);
+  border: 1px solid var(--grid); border-bottom-width: 2px;
+  border-radius: 4px; padding: 3px 5px; background: var(--surface-1);
+}
+.qinput:focus ~ .qhint { display: none; }
+
+.qlist {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 50;
+  max-height: min(70vh, 520px); overflow-y: auto;
+  background: var(--surface-1); border: 1px solid var(--grid);
+  border-radius: var(--r-md); box-shadow: var(--shadow-2); padding: var(--s-1) 0;
+}
+.qgroup {
+  display: flex; justify-content: space-between; align-items: baseline; gap: var(--s-2);
+  padding: var(--s-2) var(--s-3) var(--s-1);
+  font-size: var(--t-xs); font-weight: 620; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-muted);
+}
+.qgroup .qmore { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.qopt {
+  display: flex; align-items: baseline; gap: var(--s-3);
+  padding: 6px var(--s-3); cursor: pointer; font-size: var(--t-base);
+  border-left: 2px solid transparent;
+}
+.qopt .ql { font-weight: 560; color: var(--text-primary); white-space: nowrap; }
+.qopt .qs {
+  color: var(--text-muted); font-size: var(--t-sm); margin-left: auto;
+  text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.qopt.on { background: var(--page); border-left-color: var(--accent); }
+.qempty { padding: var(--s-3); color: var(--text-muted); font-size: var(--t-base); }
+
+/* ------------------------------------------------------------------------------ layout */
+main { max-width: 1240px; margin: 0 auto; padding: var(--s-5) var(--s-5) var(--s-7); }
+main:focus { outline: none; }
+main > section { margin-top: var(--s-6); }
+
+.lede { max-width: var(--measure); margin: 0 0 var(--s-5); }
+.lede h1 { font-size: var(--t-2xl); margin-bottom: var(--s-2); }
+.lede p { margin: 0; color: var(--text-secondary); font-size: var(--t-md); }
+
+.stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--s-4); margin: 0 0 var(--s-5);
+  padding: var(--s-4) 0; border-top: 1px solid var(--grid); border-bottom: 1px solid var(--grid);
+}
+.stat .v { font-size: var(--t-2xl); font-weight: 650; letter-spacing: -0.03em; line-height: 1.1; }
+.stat .k { font-size: var(--t-sm); color: var(--text-secondary); margin-top: 2px; }
+.stat .s { font-size: var(--t-xs); color: var(--text-muted); }
+
+/* ------------------------------------------------------------------------------ legend */
+.legend {
+  display: flex; align-items: center; gap: var(--s-3) var(--s-4); flex-wrap: wrap;
+  padding: var(--s-2) var(--s-3); border: 1px solid var(--grid); border-radius: var(--r-md);
+  background: var(--surface-1); margin: 0 0 var(--s-4); font-size: var(--t-base);
+}
+.legend .items { display: flex; align-items: center; gap: var(--s-3); }
+.legend .it { display: flex; align-items: center; gap: 5px; color: var(--text-secondary); }
+.legend .sw { width: 13px; height: 13px; border-radius: 3px; display: inline-block; flex: none; }
+.legend .chips { display: flex; gap: var(--s-1); flex-wrap: wrap; margin-left: auto; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: var(--t-xs); padding: 2px 7px; border-radius: 99px;
+  border: 1px solid var(--grid); background: var(--page); color: var(--text-secondary);
+}
+.chip .n { color: var(--text-muted); }
+
+/* A chip that filters. It has to LOOK pressable next to the read-only swatch row it shares
+   a box with, or half the legend silently invites a click the other half ignores. */
+.chip.pick {
+  font: inherit; font-size: var(--t-xs); cursor: pointer;
+  transition: border-color .12s ease, background .12s ease, color .12s ease;
+}
+.chip.pick:hover { border-color: var(--axis); color: var(--text-primary); }
+.chip.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip.pick.on {
+  background: var(--ev-1); border-color: var(--ev-3);
+  color: var(--text-primary); font-weight: 620;
+}
+.chip.pick.on .n { color: var(--text-secondary); }
+.chip.pick.clear { border-style: dashed; }
+/* Present but empty in this scope. Dropping it would make the row change shape between
+   chromosomes; "no result here" is worth a place. */
+.chip.off { opacity: .45; }
+@media (prefers-reduced-motion: reduce) { .chip.pick { transition: none; } }
+
+/* -------------------------------------------------------------------------------- grid */
+.grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(252px, 1fr));
+  gap: var(--s-3);
+}
+.card {
+  border: 1px solid var(--grid); border-radius: var(--r-md); background: var(--surface-1);
+  padding: var(--s-3) var(--s-3) var(--s-2); text-decoration: none; color: inherit;
+  display: block; transition: border-color .12s, box-shadow .12s, transform .12s;
+}
+.card:hover { border-color: var(--axis); box-shadow: var(--shadow-1); transform: translateY(-1px); }
+.card .hd { display: flex; align-items: center; gap: var(--s-2); margin-bottom: var(--s-2); }
+.card .name { font-weight: 640; font-size: var(--t-md); letter-spacing: -0.01em; }
+.card .muted { font-size: var(--t-sm); }
+.card .badge {
+  margin-left: auto; font-size: var(--t-xs); font-weight: 650; color: #fff;
+  padding: 1px 8px; border-radius: 99px; text-align: center; white-space: nowrap;
+  background: var(--page); color: var(--text-secondary); border: 1px solid var(--axis);
+}
+.card .badge.none { color: var(--text-muted); border-color: var(--grid); font-weight: 400; }
+.card .sub { font-size: var(--t-xs); color: var(--text-muted); margin-top: var(--s-1); }
+
+/* ------------------------------------------------------------------------------ detail */
+.detailhd {
+  display: flex; align-items: baseline; gap: var(--s-4); flex-wrap: wrap;
+  margin: 0 0 var(--s-4); padding-bottom: var(--s-3); border-bottom: 1px solid var(--grid);
+}
+.detailhd h1 { font-size: var(--t-xl); }
+
+.chart {
+  margin: 0; border: 1px solid var(--grid); border-radius: var(--r-md);
+  background: var(--surface-1); padding: var(--s-2) var(--s-1) var(--s-1);
+}
+.chart figcaption {
+  padding: var(--s-2) var(--s-3) var(--s-1); color: var(--text-muted);
+  font-size: var(--t-sm); max-width: var(--measure);
+}
+
+.controls { display: flex; gap: var(--s-3); align-items: center; flex-wrap: wrap; margin: 0 0 var(--s-3); }
+.controls label.chk {
+  font-size: var(--t-base); color: var(--text-secondary);
+  display: flex; gap: 6px; align-items: center; cursor: pointer;
+}
+
+svg { display: block; width: 100%; height: auto; }
+svg text { fill: var(--text-muted); font-size: 10.5px; }
+svg .axis line, svg .axis path { stroke: var(--axis); }
+svg .gridline { stroke: var(--grid); stroke-width: 1; }
+svg circle:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* A segmented pair, not a slider: the manuscript states two bands, not a continuum. */
+fieldset.seg {
+  display: flex; align-items: center; gap: 2px; margin: 0; padding: 3px 4px 3px 10px;
+  border: 1px solid var(--grid); border-radius: var(--r-md); background: var(--surface-1);
+}
+fieldset.seg legend {
+  float: left; padding: 0 var(--s-2) 0 0;
+  font-size: var(--t-xs); font-weight: 620; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-muted);
+}
+fieldset.seg label {
+  display: flex; align-items: center; gap: 5px;
+  padding: 3px 9px; border-radius: var(--r-sm); cursor: pointer;
+  border: 1px solid transparent; font-size: var(--t-base); color: var(--text-secondary);
+}
+fieldset.seg label:has(input:checked) {
+  border-color: var(--accent); color: var(--text-primary); background: var(--page);
+}
+fieldset.seg input { accent-color: var(--accent); margin: 0; }
+
+/* Primary and suggestive must be separable without colour alone, so the two carry
+   different weight, style and border as well as different ink. */
+.tier {
+  font-size: 10px; letter-spacing: .05em; text-transform: uppercase; padding: 1px 5px;
+  border-radius: 4px; border: 1px solid var(--grid); white-space: nowrap; flex: none;
+}
+.tier.primary { color: var(--text-primary); font-weight: 660; border-color: var(--axis); }
+.tier.suggestive { color: var(--text-muted); font-weight: 400; font-style: italic; }
+.tip .tier { margin-right: 5px; }
+
+/* What the scan regressed on. Separable without colour, like .tier above: a called genotype
+   gets a solid rule and normal case, an imputed dosage a dashed one and italics. */
+.expo {
+  font-size: 10px; letter-spacing: .03em; padding: 1px 5px; border-radius: 4px;
+  white-space: nowrap; flex: none; color: var(--text-secondary);
+}
+.expo.direct { border: 1px solid var(--axis); font-weight: 620; }
+.expo.imputed { border: 1px dashed var(--grid); font-style: italic; }
+
+/* A note that explains the line it hangs from, rather than a section that follows it. The
+   summary IS the line; opening it adds the explanation underneath. */
+/* The two accuracies are one field with two readings, so they stack rather than running
+   together on one line where the reader has to find the separator. */
+.cvr2 .cvline { display: block; }
+.cvr2 .cvline + .cvline { color: var(--text-secondary); }
+/* An abbreviation, not a decorated span: the dotted rule is the convention for "this expands"
+   and <abbr title> is what a screen reader announces as an expansion. */
+.cvr2 abbr.mtag {
+  text-decoration: underline dotted var(--grid); text-underline-offset: 2px;
+  cursor: help; font-variant-numeric: tabular-nums;
+}
+
+details.pnote { margin-top: 2px; }
+details.pnote > summary { font-size: var(--t-base); color: var(--text-muted); }
+details.pnote > summary::marker { color: var(--grid); }
+details.pnote > div { margin-top: 3px; padding-left: var(--s-2);
+  border-left: 2px solid var(--grid); max-width: 78ch; }
+
+/* ------------------------------------------------------------------------------- lists */
+details { margin-top: var(--s-4); }
+details > summary {
+  cursor: pointer; font-size: var(--t-base); color: var(--text-secondary);
+  padding: var(--s-1) 0; list-style-position: outside;
+}
+details > summary:hover { color: var(--text-primary); }
+
+.hitlist { list-style: none; margin: var(--s-2) 0 0; padding: 0; }
+.hitlist .row {
+  display: flex; align-items: baseline; gap: var(--s-3);
+  padding: var(--s-2) var(--s-3); border: 1px solid var(--grid); border-radius: var(--r-md);
+  background: var(--surface-1); margin-bottom: var(--s-1);
+  text-decoration: none; color: inherit;
+}
+.hitlist .row:hover { border-color: var(--axis); }
+.hitlist .kind {
+  font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-muted); min-width: 96px; flex: none;
+}
+.hitlist .ttl { font-weight: 580; }
+.hitlist .sub { margin-left: auto; text-align: right; font-size: var(--t-sm); }
+
+/* ------------------------------------------------------------------------------ tables */
+table.tbl {
+  border-collapse: collapse; width: 100%; font-size: var(--t-base); margin-top: var(--s-2);
+}
+table.tbl th, table.tbl td {
+  text-align: left; padding: 6px 9px; border-bottom: 1px solid var(--grid);
+}
+table.tbl thead th {
+  position: sticky; top: var(--header-h); z-index: 2; background: var(--page);
+  font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-muted); font-weight: 620;
+}
+table.tbl td.n, table.tbl th.n { text-align: right; font-variant-numeric: tabular-nums; }
+table.tbl tr.hit td:first-child { box-shadow: inset 3px 0 0 var(--ev-2); }
+table.tbl tbody tr:hover { background: var(--surface-1); }
+table.tbl td a { color: inherit; text-decoration: none; }
+table.tbl td a:hover { color: var(--accent); text-decoration: underline; }
+
+/* ------------------------------------------------------------------------------- panel */
+.panel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 408px; max-width: 94vw; z-index: 40;
+  background: var(--surface-1); border-left: 1px solid var(--grid);
+  box-shadow: var(--shadow-3); padding: var(--s-4) var(--s-5) var(--s-6);
+  overflow-y: auto; overscroll-behavior: contain;
+  animation: slide .16s ease-out;
+}
+@keyframes slide { from { transform: translateX(14px); opacity: .4; } }
+/* Only where there is room to give it. Below this the drawer is most of the width and moving
+   the page aside would leave the figure narrower than it is useful; below 720 it is a sheet
+   across the bottom and does not cover the chart at all.
+
+   The max-width is load-bearing, not belt-and-braces. `main` carries `width: 100%` for the
+   flex layout and `max-width: 1240px`, so a margin alone had nothing to take: the box stayed
+   1240 wide, the auto left margin collapsed to 0, and the right margin simply overflowed -
+   measured, 197 px of the chart still under the drawer. Capping the width is what actually
+   moves the right edge. */
+@media (min-width: 1100px) {
+  body.panelopen main {
+    max-width: min(1240px, calc(100vw - 408px));
+    margin-left: 0;
+    margin-right: 408px;
+  }
+}
+.panel:focus { outline: none; }
+.phd {
+  display: flex; align-items: flex-start; gap: var(--s-3);
+  padding-bottom: var(--s-3); border-bottom: 1px solid var(--grid);
+}
+.panel .pttl { min-width: 0; }
+.panel h2 { font-size: var(--t-lg); overflow-wrap: anywhere; }
+.panel .pact { margin-left: auto; display: flex; gap: 6px; flex: none; }
+.panel dl {
+  display: grid; grid-template-columns: auto 1fr; gap: 5px var(--s-4);
+  margin: var(--s-4) 0; font-size: var(--t-base);
+}
+.panel dt { color: var(--text-muted); }
+.panel dd { margin: 0; }
+.panel h3 { margin: var(--s-5) 0 var(--s-2); }
+.panel .popgen h3 { margin-top: var(--s-5); }
+
+.hitrow {
+  display: flex; gap: var(--s-2); align-items: flex-start;
+  padding: var(--s-2) 0; border-bottom: 1px solid var(--grid); font-size: var(--t-base);
+}
+/* The ink comes from evInk() in main.js, not from here: it has to follow the ramp step the
+   tag sits on, and the ramp inverts between modes. A fixed #fff was 2.11:1 on light --ev-1. */
+.hitrow .tag {
+  font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 640;
+  flex: none; letter-spacing: .02em;
+}
+.hitmain { flex: 1; min-width: 0; }
+.hitmain .ht { overflow-wrap: anywhere; }
+.hitmain > div + div { margin-top: 2px; }
+
+/* -------------------------------------------------- population differentiation */
+.popgen .pops { display: flex; flex-wrap: wrap; gap: var(--s-1); margin: var(--s-2) 0 5px; }
+.popgen .pop {
+  font-size: var(--t-sm); padding: 2px 7px; border-radius: var(--r-sm);
+  border: 1px solid var(--grid); color: var(--text-secondary); background: var(--page);
+}
+.popgen .pop b { color: var(--text-muted); font-weight: 620; margin-right: 4px; }
+.popgen .pop .n { color: var(--text-muted); font-size: 10px; }
+.popgen .pop.has { border-color: var(--axis); color: var(--text-primary); }
+
+/* ----------------------------------------------------------------------------- tooltip */
+.tip {
+  position: fixed; pointer-events: none; z-index: 60; opacity: 0; transition: opacity .09s;
+  background: var(--surface-1); border: 1px solid var(--axis); border-radius: var(--r-md);
+  padding: var(--s-2) var(--s-3); font-size: var(--t-base); box-shadow: var(--shadow-2);
+  max-width: 300px;
+}
+.tip[aria-hidden="false"] { opacity: 1; }
+.tip .t { font-weight: 640; margin-bottom: 2px; }
+.tip .r { color: var(--text-secondary); font-variant-numeric: tabular-nums; font-size: var(--t-sm); }
+.tip .tiphits { margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--grid); }
+
+/* ------------------------------------------------------------------------------ notice */
+.notice {
+  border: 1px solid var(--grid); border-left: 3px solid var(--ev-2);
+  border-radius: 0 var(--r-md) var(--r-md) 0; background: var(--surface-1);
+  padding: var(--s-3) var(--s-4); margin: 0 0 var(--s-4);
+  font-size: var(--t-base); color: var(--text-secondary); max-width: var(--measure);
+}
+.notice b { color: var(--text-primary); }
+
+.excl { margin-top: var(--s-6); border-top: 1px solid var(--grid); padding-top: var(--s-3); }
+.excl ul { margin: var(--s-2) 0 0; padding-left: var(--s-5); max-width: 84ch; }
+.excl li { font-size: var(--t-base); color: var(--text-secondary); margin-bottom: 7px; }
+.excl li b { color: var(--text-primary); font-weight: 620; }
+
+/* ----------------------------------------------------------------------------- skeleton */
+.loading { display: none; }
+.skeleton { display: none; }
+body.booting .skeleton { display: block; }
+.sk { background: var(--grid); border-radius: var(--r-sm); opacity: .55; }
+.sk-h1 { height: 30px; width: 340px; margin-bottom: var(--s-3); }
+.sk-p { height: 15px; width: min(560px, 90%); margin-bottom: var(--s-5); }
+.sk-row { display: flex; gap: var(--s-5); margin-bottom: var(--s-5); }
+.sk-stat { height: 44px; width: 120px; }
+.sk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(252px, 1fr)); gap: var(--s-3); }
+.sk-card { height: 108px; }
+@media (prefers-reduced-motion: no-preference) {
+  .sk { animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: .38; } 50% { opacity: .68; } }
+}
+
+/* ------------------------------------------------------------------------------- footer */
+.foot { border-top: 1px solid var(--grid); background: var(--surface-1); margin-top: var(--s-7); }
+.footin {
+  max-width: 1240px; margin: 0 auto; padding: var(--s-5);
+  display: grid; grid-template-columns: 2fr 1fr 1fr; gap: var(--s-5);
+}
+.foot .ftitle {
+  font-size: var(--t-xs); font-weight: 620; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-secondary); margin-bottom: var(--s-2);
+}
+.foot p { margin: 0 0 var(--s-2); max-width: 56ch; }
+
+/* -------------------------------------------------------------------------- responsive */
+@media (max-width: 900px) {
+  .topin { flex-wrap: wrap; padding: var(--s-2) var(--s-4); gap: var(--s-2); }
+  .searchmount { order: 3; flex-basis: 100%; }
+  .qbox { max-width: none; }
+  .brand .tagline { display: none; }
+  main { padding: var(--s-4); }
+  .footin { grid-template-columns: 1fr; gap: var(--s-4); }
+  .legend .chips { margin-left: 0; }
+  table.tbl thead th { position: static; }
+  /* Nine columns do not fit a phone. Measured at 390 px: the table is 679 px wide and the
+     document scrolled sideways with it. It scrolls inside its own box instead. */
+  details > table.tbl { display: block; overflow-x: auto; }
+}
+@media (max-width: 720px) {
+  .panel {
+    top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 82vh;
+    border-left: none; border-top: 1px solid var(--grid);
+    border-radius: var(--r-lg) var(--r-lg) 0 0; box-shadow: var(--shadow-2);
+    animation: rise .16s ease-out;
+  }
+  @keyframes rise { from { transform: translateY(18px); opacity: .4; } }
+  .lede h1 { font-size: var(--t-xl); }
+  .hitlist .row { flex-wrap: wrap; }
+  .hitlist .sub { margin-left: 0; text-align: left; flex-basis: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  .card:hover { transform: none; }
+}
+
+/* ---------------------------------------------------------------------------- printing */
+@media print {
+  .top, .foot, .tip, .panel, .controls, .skip { display: none !important; }
+  main { max-width: none; padding: 0; }
+  .card, .legend, .chart { break-inside: avoid; }
+  details { display: block; }
+  details > summary { display: none; }
+}
+
+/* ------------------------------------------------------------------------ filters */
+/* The floors sit beside the significance control because they are the same kind of
+   thing: a statement about what is on the page. The count of what they remove is part
+   of the control, not a footnote, since a filter that hides a published result quietly
+   is the one failure mode worth designing against. */
+.seg.filters { display: flex; gap: var(--s-3); align-items: center; flex-wrap: wrap; }
+.seg.filters .fl {
+  display: flex; gap: 6px; align-items: center;
+  font-size: var(--t-sm); color: var(--text-secondary);
+}
+.numin {
+  width: 5.4em; padding: 3px 6px; border-radius: var(--r-sm);
+  border: 1px solid var(--grid); background: var(--surface-1); color: var(--text-primary);
+  font: inherit; font-size: var(--t-sm); font-variant-numeric: tabular-nums;
+}
+.numin:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.fnote { flex-basis: 100%; font-size: var(--t-sm); }
+
+/* --------------------------------------------------------------- substrate tracks */
+svg text.tlab { fill: var(--text-secondary); font-size: 10px; font-weight: 620; }
+/* The name beside the mark of the record that is open. Its colour is set on the element, from
+   --accent, so the halo pass underneath can carry its own. */
+svg text.sellab { font-size: 11px; font-weight: 640; }
+/* The haplotype count under each ancestry facet's name, and the shared scale maximum. Muted
+   because it is a caveat on the row, not the row's title - but present on every row, because
+   a facet without its n is a shape with no way to tell signal from five dips. */
+svg text.tsub { fill: var(--text-muted); font-size: 9px; }
+/* the stratum swatch in the dip tooltip, so a line ties to a band in the stack */
+.tsw {
+  display: inline-block; width: 9px; height: 9px; border-radius: 2px;
+  margin-right: 5px; flex: none; vertical-align: -1px;
+}
+.notice.small { font-size: var(--t-sm); margin: var(--s-2) var(--s-3) var(--s-2); }
+
+/* ------------------------------------------------------------------- by ancestry */
+/* The .anctbl rules that were here described a table that ancestryStrip() no longer builds -
+   it draws chips, because the strip repeats for every association on an SV and one carries
+   fourteen. The reasoning they carried is worth keeping and now lives on ancestryStrip()
+   itself: an absent stratum is unmeasured, not zero, and every graphical form for "six
+   numbers" draws absence as a position on the scale. */
+.anc { margin-top: var(--s-2); padding-top: var(--s-2); border-top: 1px dashed var(--grid); }
+.small { font-size: var(--t-sm); }
+.hitmain .small { margin-top: 3px; }
+
+.ancline { display: flex; gap: var(--s-2); align-items: baseline; flex-wrap: wrap; margin-top: 5px; }
+.eyebrow.inline { margin: 0; flex: none; }
+.ancchips { display: flex; flex-wrap: wrap; gap: 4px; }
+.achip {
+  font-size: var(--t-sm); padding: 1px 6px; border-radius: var(--r-sm);
+  border: 1px solid var(--grid); color: var(--text-muted); background: var(--page);
+  font-family: inherit; cursor: pointer;
+}
+.achip[aria-expanded="true"] { border-color: var(--ev-4); background: var(--surface-1); }
+.ancdetail { margin-top: 5px; }
+.achip b { font-weight: 620; margin-right: 3px; }
+.achip.has { border-color: var(--axis); color: var(--text-primary); background: var(--surface-1); }
+.achip.has b { color: var(--ev-4); }
+
+.caveat { margin: 0 0 var(--s-2); }
+
+/* --------------------------------------------------------- linkage disequilibrium */
+/* Closed until asked for: opening the panel standardises a chromosome's genotypes and
+   rasterises up to 7.6 million cells, which is work a reader looking at the scatter above
+   never asked for. The display selection and the colour key sit on one row because the key
+   is what makes the selection readable. */
+/* -------------------------------------------------------------------- track panels */
+/* One panel per track, foldable, sharing an abscissa. Each carries its own chrome and its
+   own controls, so folding one leaves the others on the same axis. */
+.chart.stack {
+  border: 0; background: none; padding: 0;
+}
+.chart.stack > svg { display: block; width: 100%; height: auto; }
+
+.trackpanel {
+  margin: 0 0 var(--s-2); border: 1px solid var(--grid); border-radius: var(--r-md);
+  background: var(--surface-1); padding: var(--s-1);
+}
+.trackpanel > summary {
+  padding: var(--s-1) var(--s-2); color: var(--text-primary);
+}
+.trackpanel > summary:hover { color: var(--text-primary); }
+.trackpanel > summary .tname { font-weight: 500; }
+.trackpanel > summary .thint { font-size: var(--t-sm); margin-left: var(--s-2); }
+.trackpanel[open] > summary {
+  border-bottom: 1px solid var(--grid); margin-bottom: var(--s-1);
+}
+.trackpanel > svg { display: block; width: 100%; height: auto; }
+.trackctl {
+  display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center;
+  padding: var(--s-1) var(--s-2) 0;
+}
+
+.ldsec { margin-top: var(--s-5); }
+.ldbody { margin-top: var(--s-3); }
+.ldctl { align-items: center; margin-bottom: var(--s-2); }
+
+.ldscale {
+  display: flex; align-items: center; gap: 6px;
+  font-size: var(--t-sm); color: var(--text-muted);
+}
+.ldscale .bar {
+  width: 132px; height: 10px; border-radius: 3px;
+  border: 1px solid var(--grid); display: inline-block;
+}
+.ldscale .e { font-size: var(--t-xs); }
+.ldscale .k {
+  text-transform: uppercase; letter-spacing: .07em;
+  font-size: var(--t-xs); font-weight: 620;
+}
+
+/* The methods note, folded. It is the same 193 words on every chromosome and it describes
+   how the figure was made rather than what it shows, which is a different question from the
+   one a reader arrives with. */
+.ldmethods { margin: var(--s-2) var(--s-3) 0; }
+.ldmethods > summary { font-size: var(--t-sm); color: var(--text-muted); }
+.ldmethods .notice.small { margin-left: 0; margin-right: 0; }
+
+.ldchart { margin-top: var(--s-2); }
+/* line-height 0 so the canvas leaves no inline gap for the overlay to disagree with */
+.ldstack { position: relative; line-height: 0; }
+.ldcanvas { display: block; width: 100%; height: auto; }
+/* The overlay carries the landmarks that have to sit on top of the ink. Only its marks take
+   the pointer, so the triangle underneath keeps its own hover. */
+.ldover {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;
+}
+.ldover .ldmark { pointer-events: auto; cursor: pointer; }
+.ldover .ldmark:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* The fan's labels take this fill. The triangle's region labels do NOT - they carry their
+   region's colour, set inline in ld.js precisely because this rule and the `svg text` rule
+   above it would both beat a fill attribute. Do not move that colour back onto the element
+   as an attribute; it renders grey. */
+svg text.ldnote { fill: var(--text-muted); font-size: 9.5px; font-weight: 620; }
+svg text.ldtick { fill: var(--text-muted); font-size: 9.5px; }
+.ldfan { display: block; width: 100%; height: auto; margin-top: 2px; }
+
+/* ------------------------------------------------ one variant's row, in the record */
+.ldrow { margin-top: var(--s-5); }
+.ldprof { display: block; width: 100%; height: auto; margin-bottom: var(--s-2); }
+.ldpart {
+  display: flex; align-items: baseline; gap: 5px; flex-wrap: wrap;
+  font-size: var(--t-sm); margin-bottom: 3px;
+}
+.ldpart .sw {
+  width: 9px; height: 9px; border-radius: 2px; flex: none;
+  display: inline-block; align-self: center;
+}
+.ldpart b { font-weight: 600; color: var(--text-secondary); }
+.ldpart .id { color: var(--text-primary); overflow-wrap: anywhere; }
+.ldpart .v { font-weight: 620; }
+.ldrow button { margin-top: var(--s-2); }
+
+/* ---------------------------------------------------------------- arrays by individual */
+.arrbar { display: flex; gap: var(--s-4); align-items: center; flex-wrap: wrap;
+  margin: var(--s-4) 0 var(--s-3); }
+.arrpick { font-size: var(--t-sm); color: var(--text-secondary); }
+.arrpick select { margin-left: var(--s-2); }
+.arrmodes { display: inline-flex; border: 1px solid var(--grid); border-radius: var(--r-sm);
+  overflow: hidden; }
+.arrmode { font: inherit; font-size: var(--t-sm); padding: var(--s-2) var(--s-3);
+  background: var(--surface-1); color: var(--text-secondary); border: 0; cursor: pointer;
+  border-left: 1px solid var(--grid); }
+.arrmode:first-child { border-left: 0; }
+.arrmode.on { background: var(--accent); color: #fff; font-weight: 600; }
+.arrfig { overflow-x: auto; margin: var(--s-3) 0 var(--s-2); }
+.arrfig svg { display: block; max-width: 100%; height: auto; }
+.arrkey { display: flex; gap: var(--s-4); flex-wrap: wrap; font-size: var(--t-xs);
+  color: var(--text-muted); margin-bottom: var(--s-3); }
+.arrkey i { display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  margin-right: var(--s-1); vertical-align: -1px; font-style: normal;
+  border: 1px solid var(--grid); }
+.arrlede:not(:empty) { border-bottom: 1px solid var(--grid); padding-bottom: var(--s-4);
+  margin-bottom: var(--s-5); }
+.arrentry { margin-top: var(--s-6); }
+.arrentrys { display: grid; gap: var(--s-3); }

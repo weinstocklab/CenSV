@@ -1,0 +1,77 @@
+name: infra
+
+# Infrastructure changes. Manual only, with plan separated from apply.
+#
+# Creating IAM roles, security groups and load balancers needs far broader permissions than
+# an application deploy, so this workflow runs by hand behind the `infra` environment's
+# approval gate, while deploy.yml pushes images under a narrow role.
+#
+# The role used here manages ECR, ECS, ELB, IAM, EC2 (describe), S3 and DynamoDB, and is
+# provisioned by an account administrator.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "plan or apply"
+        required: true
+        default: plan
+        type: choice
+        options: [plan, apply]
+
+concurrency:
+  group: infra-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform:
+    name: terraform ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    environment: infra # apply waits on this environment's reviewers
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_INFRA_ROLE }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: censv-infra-${{ github.run_id }}
+
+      - name: Init
+        run: terraform -chdir=infra init -backend-config=backend.hcl -input=false
+
+      - name: Plan
+        run: terraform -chdir=infra plan -input=false -out=tfplan
+
+      # Shown even on plan runs, so a reviewer approving the apply can see what they are
+      # approving without opening the raw log.
+      - name: Plan summary
+        run: |
+          {
+            echo '### Terraform plan'
+            echo '```'
+            terraform -chdir=infra show -no-color tfplan | tail -80
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Apply
+        if: inputs.action == 'apply'
+        run: terraform -chdir=infra apply -input=false -auto-approve tfplan
+
+      - name: Outputs
+        if: inputs.action == 'apply'
+        run: |
+          {
+            echo '### Outputs'
+            echo '```'
+            terraform -chdir=infra output
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

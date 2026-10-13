@@ -1,0 +1,104 @@
+name: deploy
+
+# Application deploys: build, push to ECR, roll the ECS service.
+#
+# Deliberately separate from infrastructure changes. This job's role can push an image and
+# update a service and nothing else - it cannot create IAM roles, security groups or load
+# balancers. Infrastructure runs from infra.yml, by hand, under an environment gate.
+#
+# One-time setup, after infra/ has been applied once:
+#   gh variable set AWS_DEPLOY_ROLE --body "$(terraform -chdir=infra output -raw github_deploy_role_arn)"
+#   gh variable set AWS_REGION      --body us-east-1
+#   gh variable set ECR_REPOSITORY  --body censv-prod
+#   gh variable set ECS_CLUSTER     --body censv-prod
+#   gh variable set ECS_SERVICE     --body censv-prod
+#
+# There is no access key anywhere: the job exchanges its short-lived GitHub OIDC token for
+# the role, which is scoped by `sub` to this repository.
+
+# Started by hand, from the Actions tab or `gh workflow run deploy.yml`. The variables
+# below are set once infra/ has been applied and the task execution role can be passed; a
+# push trigger before that point starts a run that stops at its first step.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write # required to request the OIDC token
+
+jobs:
+  deploy:
+    name: push image and roll the service
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fail early if the deploy variables are unset
+        run: |
+          missing=""
+          for v in AWS_DEPLOY_ROLE AWS_REGION ECR_REPOSITORY ECS_CLUSTER ECS_SERVICE; do
+            eval "val=\${$v}"
+            [ -n "$val" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "Repository variables not set:$missing"
+            echo "See the header of this workflow for the gh commands that set them."
+            exit 1
+          fi
+        env:
+          AWS_DEPLOY_ROLE: ${{ vars.AWS_DEPLOY_ROLE }}
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+          ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+          ECS_SERVICE: ${{ vars.ECS_SERVICE }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: censv-deploy-${{ github.run_id }}
+
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Two tags per push: the commit SHA is the rollback handle, `latest` is what the task
+      # definition tracks. Without the SHA tag there is no way back to a known-good image.
+      - name: Build and push
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPO: ${{ vars.ECR_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          SHA_TAG="sha-${GITHUB_SHA::12}"
+          docker build -f docker/Dockerfile \
+            -t "$REGISTRY/$REPO:$SHA_TAG" \
+            -t "$REGISTRY/$REPO:latest" .
+          docker push "$REGISTRY/$REPO:$SHA_TAG"
+          docker push "$REGISTRY/$REPO:latest"
+          echo "pushed $SHA_TAG"
+
+      - name: Roll the service
+        env:
+          CLUSTER: ${{ vars.ECS_CLUSTER }}
+          SERVICE: ${{ vars.ECS_SERVICE }}
+        run: |
+          aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" \
+            --force-new-deployment --no-cli-pager >/dev/null
+          echo "waiting for the service to stabilise"
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+          echo "deployed"
+
+      # `services-stable` returns when the desired count is running and healthy, which is a
+      # statement about the task, not about what the site serves. This asks the running
+      # deployment what it is actually running.
+      - name: Report what is deployed
+        run: |
+          aws ecs describe-services --cluster "${{ vars.ECS_CLUSTER }}" \
+            --services "${{ vars.ECS_SERVICE }}" \
+            --query 'services[0].deployments[?status==`PRIMARY`].[taskDefinition,runningCount,desiredCount]' \
+            --output text --no-cli-pager

@@ -1,0 +1,38 @@
+node_modules/
+web/dist/
+__pycache__/
+*.pyc
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.log
+.DS_Store
+shots/
+docs/decisions/*.html
+docs/decisions/CLAUDE_MD_PROPOSAL.html
+
+# The single-file build is a 2.1 MB generated artefact; rebuild with
+# python web/tools/build_singlefile.py rather than committing it.
+CenSV_offline.html
+
+# verify_ld_panel.mjs renders the panel it just measured, so a human can look at it.
+# Rewritten every run.
+ld_panel.jpg
+
+# The password for the locked build. Generated, never committed.
+.password
+CenSV_locked.html
+_published.html
+
+# transient watch logs; anything worth keeping is quoted in FINDINGS
+_*.log
+# SLURM build logs. build_local.sh is submitted rather than run on the head node.
+logs/
+# pixi environments
+.pixi/*
+!.pixi/config.toml
+
+# Screenshots the haplotype suite renders so a human can look at what it measured.
+# Rewritten every run.
+hap_*.jpg

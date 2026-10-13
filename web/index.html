@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CenSV — centromeric structural variant browser</title>
+<meta name="description" content="Every imputed centromeric structural variant across all 23 human centromeres on T2T-CHM13 v2.0, with the expression, splicing, methylation, dip-region and disease associations reported for each.">
+<meta name="color-scheme" content="light dark">
+<!-- `noindex, nofollow` sat here from 2026-08, while the page was behind a passphrase and
+     there was nothing for a crawler to reach. The preprint posted on 2026-10-12 and the page
+     opened; a resource a paper points at has to be findable from the paper's own title. -->
+<meta name="citation_title" content="Common centromeric variation associates with molecular and complex traits in humans">
+<meta name="citation_author" content="Dong, Yikai">
+<meta name="citation_author" content="Cutler, David">
+<meta name="citation_author" content="Weinstock, Joshua S">
+<meta name="citation_doi" content="10.64898/2026.10.09.26365154">
+<meta property="og:title" content="CenSV — centromeric structural variant browser">
+<meta property="og:description" content="10,705 imputed centromeric SVs on T2T-CHM13 v2.0, coloured by how many independent analyses report a hit.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://yikaidong-git.github.io/CenSV/">
+<meta property="og:image" content="https://yikaidong-git.github.io/CenSV/docs/overview.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<!-- The mark is the evidence ramp itself: four steps, light to dark, left to right. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3.5' fill='%23fcfcfb'/%3E%3Crect x='2' y='3' width='2.6' height='10' rx='1' fill='%23efa070'/%3E%3Crect x='5.4' y='3' width='2.6' height='10' rx='1' fill='%23e07038'/%3E%3Crect x='8.8' y='3' width='2.6' height='10' rx='1' fill='%23b8501e'/%3E%3Crect x='12.2' y='3' width='2.6' height='10' rx='1' fill='%238a3a10'/%3E%3C/svg%3E">
+</head>
+<body class="viz-root booting">
+
+<a class="skip" href="#app">Skip to content</a>
+
+<header class="top">
+  <div class="topin">
+    <a class="brand" href="#/" aria-label="CenSV, home">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="wordmark">
+        <b>CenSV</b>
+        <span class="tagline">centromeric structural variants</span>
+      </span>
+    </a>
+    <div id="searchmount" class="searchmount"></div>
+    <button id="theme" class="ghost icon" type="button"
+            aria-pressed="false" aria-label="Toggle colour theme" title="Toggle colour theme">
+      <span aria-hidden="true">◐</span>
+    </button>
+  </div>
+  <nav class="crumbs" id="crumbs" aria-label="Breadcrumb"></nav>
+</header>
+
+<main id="app" tabindex="-1">
+  <!-- A skeleton rather than a spinner: the catalog is ~3.8 MB, and a shape that matches
+       what is coming reads as loading rather than as broken. -->
+  <div class="skeleton" aria-hidden="true">
+    <div class="sk sk-h1"></div><div class="sk sk-p"></div>
+    <div class="sk-row">
+      <div class="sk sk-stat"></div><div class="sk sk-stat"></div>
+      <div class="sk sk-stat"></div><div class="sk sk-stat"></div>
+    </div>
+    <div class="sk-grid">
+      <div class="sk sk-card"></div><div class="sk sk-card"></div>
+      <div class="sk sk-card"></div><div class="sk sk-card"></div>
+      <div class="sk sk-card"></div><div class="sk sk-card"></div>
+      <div class="sk sk-card"></div><div class="sk sk-card"></div>
+    </div>
+  </div>
+  <p class="loading">Loading the catalog…</p>
+</main>
+
+<footer class="foot">
+  <div class="footin">
+    <div class="fcol">
+      <div class="ftitle">CenSV</div>
+      <p class="muted">
+        Companion browser to centromeric structural variation.
+      </p>
+    </div>
+    <div class="fcol">
+      <div class="ftitle">This build</div>
+      <p id="provenance" class="muted"></p>
+      <p class="muted">T2T-CHM13 v2.0 · CenSat v2.1 active arrays</p>
+    </div>
+    <div class="fcol">
+      <div class="ftitle">Source</div>
+      <p class="muted">
+        <a href="https://github.com/weinstocklab/CenSV">weinstocklab/CenSV</a>
+      </p>
+      <p class="muted">
+        Dong Y, Cutler D, Weinstock JS.
+        <a href="https://doi.org/10.64898/2026.10.09.26365154">medRxiv 2026</a>
+      </p>
+    </div>
+    <div class="fcol">
+      <div class="ftitle">Visits</div>
+      <!-- The two things CNIL and Schedule A1 para 5 of the UK Data (Use and Access) Act
+           both ask for: what is collected, and a way out. At 121 words this read as a
+           defence, which is its own answer to a question nobody had asked. -->
+      <p class="muted">
+        One visit, with its country, by
+        <a href="https://www.goatcounter.com/help/privacy">GoatCounter</a>. Do-not-track or a
+        content blocker stops it.
+      </p>
+    </div>
+  </div>
+</footer>
+
+<div id="tip" class="tip" role="tooltip" aria-hidden="true"></div>
+<div id="announce" class="sr-only" role="status" aria-live="polite"></div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

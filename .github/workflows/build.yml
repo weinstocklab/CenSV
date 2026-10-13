@@ -1,0 +1,327 @@
+name: build
+
+# Runs on every push and pull request, with no AWS credentials. It builds the image,
+# starts it, and asserts that the served site is correct: a green run means the image is
+# deployable.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  image:
+    name: build and smoke-test the image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -f docker/Dockerfile -t censv:ci .
+
+      - name: Start container
+        run: |
+          docker run -d --name censv -p 8080:8080 censv:ci
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://localhost:8080/data/meta.json; then
+              echo "up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "container never became ready"; docker logs censv; exit 1
+
+      # The assertions below are on content and counts: a container serving an empty or
+      # truncated catalog still answers 200 to every request.
+      - name: Assert the site is actually served
+        run: |
+          set -euo pipefail
+
+          echo "--- index"
+          curl -fsS http://localhost:8080/ | grep -q "CenSV" \
+            || { echo "index does not mention CenSV"; exit 1; }
+
+          echo "--- meta"
+          meta=$(curl -fsS http://localhost:8080/data/meta.json)
+          echo "$meta" | jq -e '.n_svs > 0' >/dev/null \
+            || { echo "meta.n_svs missing or zero"; exit 1; }
+          echo "$meta" | jq -e '.coordinate_system == "T2T-CHM13 v2.0"' >/dev/null \
+            || { echo "unexpected coordinate system"; exit 1; }
+          commit=$(echo "$meta" | jq -r '.source_commit')
+          echo "data built from analysis commit $commit"
+
+          echo "--- catalog"
+          # The catalog ships COLUMNAR. It is rebuilt into rows ONCE, here, so every assertion
+          # below reads the row form it was written against and none of them had to change.
+          # This is also a third independent rehydrator, beside the ETL's own round-trip
+          # assertion and the browser's: if any two disagree, one of them is wrong.
+          curl -fsS http://localhost:8080/data/catalog.json > /tmp/catalog.col.json
+          jq -e 'has("columns") and has("data") and has("rows")' /tmp/catalog.col.json >/dev/null \
+            || { echo "catalog.json is not columnar - is this a stale build?"; exit 1; }
+          jq -c '. as $c
+                 | [range($c.rows) as $i
+                    | reduce range($c.columns | length) as $k
+                        ({}; .[$c.columns[$k]] = $c.data[$k][$i])]' \
+             /tmp/catalog.col.json > /tmp/catalog.json
+          ncol=$(jq '.columns | length' /tmp/catalog.col.json)
+          echo "rebuilt $(jq 'length' /tmp/catalog.json) rows from $ncol columns"
+
+          n_meta=$(echo "$meta" | jq -r '.n_svs')
+          n_real=$(jq 'length' /tmp/catalog.json)
+          echo "meta says $n_meta, catalog holds $n_real"
+          [ "$n_meta" = "$n_real" ] \
+            || { echo "catalog length disagrees with meta.n_svs"; exit 1; }
+
+          echo "--- every row came back with every field"
+          short=$(jq --argjson n "$ncol" '[.[] | select((keys | length) != $n)] | length' \
+                  /tmp/catalog.json)
+          [ "$short" = "0" ] || { echo "$short rebuilt rows lack a field"; exit 1; }
+
+          echo "--- every SV has a position and a chromosome"
+          bad=$(jq '[.[] | select(.pos == null or .chrom == null)] | length' /tmp/catalog.json)
+          [ "$bad" = "0" ] || { echo "$bad catalog rows lack pos or chrom"; exit 1; }
+
+          echo "--- chromosomes"
+          curl -fsS http://localhost:8080/data/chromosomes.json | jq -e 'length == 23' >/dev/null \
+            || { echo "expected 23 centromeres"; exit 1; }
+
+          curl -fsS http://localhost:8080/data/layers.json  > /tmp/layers.json
+          echo "$meta" > /tmp/meta.json
+
+          echo "--- every hit joins to a catalog SV"
+          # Every hit must join to a catalog row. A hit whose (chrom, sv_index) is absent
+          # draws nothing, which is how a catalog built from the wrong ensembles loses
+          # published results.
+          orphan=$(jq -n --slurpfile c /tmp/catalog.json --slurpfile l /tmp/layers.json '
+            ($c[0] | map("\(.chrom):\(.sv_index)") | INDEX(.)) as $k
+            | [$l[0][] | select($k["\(.chrom):\(.sv_index)"] == null)] | length')
+          echo "orphaned hits: $orphan"
+          [ "$orphan" = "0" ] || { echo "$orphan hits reference SVs absent from the catalog"; exit 1; }
+
+          echo "--- every hit declares a significance tier"
+          untiered=$(jq '[.[] | select(.tier != "primary" and .tier != "suggestive")] | length' /tmp/layers.json)
+          [ "$untiered" = "0" ] || { echo "$untiered hits carry no valid tier"; exit 1; }
+
+          echo "--- hit counts match the manifest"
+          jq -e --slurpfile l /tmp/layers.json '
+            (.n_hits == ($l[0] | length))
+            and (.n_hits_by_tier.primary    == ([$l[0][] | select(.tier == "primary")]    | length))
+            and (.n_hits_by_tier.suggestive == ([$l[0][] | select(.tier == "suggestive")] | length))
+          ' /tmp/meta.json >/dev/null || { echo "layers.json disagrees with meta hit counts"; exit 1; }
+
+          echo "--- the baked data still reproduces the manuscript"
+          # The ETL asserts these against the paper when it runs; re-asserting them here
+          # catches a stale or hand-edited bake reaching the image.
+          jq -e '
+            ([.layers[] | select(.key == "eqtl")] | .[0].tiers.primary == 86)
+            and ([.layers[] | select(.key == "sqtl")] | .[0].tiers.primary == 74)
+            and ([.layers[] | select(.key == "aou")]  | .[0].tiers.primary == 170)
+            and ([.layers[] | select(.key == "aou")]  | .[0].tiers.suggestive == 85)
+            and ([.layers[] | select(.present | not)] | length == 0)
+          ' /tmp/meta.json >/dev/null \
+            || { echo "the baked layers no longer reproduce the published counts"; jq ".layers" /tmp/meta.json; exit 1; }
+
+          echo "--- what the catalog counts"
+          # The catalog is the table every layer joins to and the number in the largest type
+          # on the front page. 10,705 rows are 8,792 distinct variants: sv_index is
+          # (variant x resolution mode).
+          jq -e '.catalog_unit.n_predictors == .n_svs' /tmp/meta.json >/dev/null \
+            || { echo "catalog_unit disagrees with meta.n_svs"; exit 1; }
+          jq -e '.catalog_unit.n_variants > 0 and .catalog_unit.n_variants <= .n_svs' \
+            /tmp/meta.json >/dev/null \
+            || { echo "distinct-variant count is absent or impossible"; exit 1; }
+          # Every variant the CDR section scans must be present, so the browser covers the
+          # same set as the paper.
+          jq -e '.catalog_unit.substrate_absent == 0' /tmp/meta.json >/dev/null \
+            || { echo "the catalog is missing variants the CDR section scans"; \
+                 jq ".catalog_unit" /tmp/meta.json; exit 1; }
+          n_var=$(jq -r '.catalog_unit.n_variants' /tmp/meta.json)
+          real=$(jq '[.[] | "\(.chrom):\(.pos):\(.svtype):\(.svlen)"] | unique | length' \
+                 /tmp/catalog.json)
+          echo "meta says $n_var distinct variants, catalog holds $real"
+          [ "$n_var" = "$real" ] \
+            || { echo "distinct-variant count disagrees with the catalog itself"; exit 1; }
+
+          echo "--- All of Us, by ancestry"
+          curl -fsS http://localhost:8080/data/ancestry.json > /tmp/ancestry.json
+
+          # res_11_aou.tex: "138 reached nominal significance in AMR, compared with 12 in
+          # EUR, two in AFR, and none in EAS, SAS, or MID". If a refreshed export moved any
+          # of these, the page's ancestry strips would contradict the sentence they present.
+          jq -e '.ancestry.of_170 as $o
+            | $o.AMR == 138 and $o.EUR == 12 and $o.AFR == 2
+              and $o.EAS == 0 and $o.SAS == 0 and $o.MID == 0' /tmp/meta.json >/dev/null \
+            || { echo "per-ancestry counts no longer match res_11_aou.tex";
+                 jq ".ancestry.of_170" /tmp/meta.json; exit 1; }
+
+          # figures_supp.tex: the six strata sum to the scan cohort.
+          jq -e '.ancestry.cohort | (to_entries | map(.value) | add) == 315204' /tmp/meta.json \
+            >/dev/null || { echo "stratum cohort sizes do not sum to 315,204"; exit 1; }
+
+          # The finding the strips exist to show: no association reaches the export
+          # threshold in two strata. If one ever did, "AMR only" would be a false label.
+          jq -e '.ancestry.spread | keys == ["0","1"]' /tmp/meta.json >/dev/null \
+            || { echo "an association now reaches the threshold in more than one stratum";
+                 jq ".ancestry.spread" /tmp/meta.json; exit 1; }
+
+          # Every per-stratum record must attach to an All of Us hit that is drawn. An
+          # unjoinable record renders a blank strip beside a hit that has data.
+          adrift=$(jq -n --slurpfile a /tmp/ancestry.json --slurpfile l /tmp/layers.json '
+            ($l[0] | map(select(.layer == "aou") | "\(.sv_locus)|\(.phecode)") | INDEX(.)) as $k
+            | [$a[0][] | select($k["\(.sv_locus)|\(.phecode)"] == null)] | length')
+          echo "per-stratum records with no matching hit: $adrift"
+          [ "$adrift" = "0" ] || { echo "$adrift ancestry records do not join to a hit"; exit 1; }
+
+          echo "--- substrate tracks"
+          curl -fsS http://localhost:8080/data/tracks.json > /tmp/tracks.json
+          jq -e '(.meth | length) == 23 and (.density | length) == 23' /tmp/tracks.json >/dev/null \
+            || { echo "tracks do not cover 23 centromeres"; exit 1; }
+          jq -e '[.meth[] | length] | unique == [60]' /tmp/tracks.json >/dev/null \
+            || { echo "the methylation profile is not 60 bins on every chromosome"; exit 1; }
+          jq -e '[.meth[][] | select(. < 0 or . > 100)] | length == 0' /tmp/tracks.json >/dev/null \
+            || { echo "a methylation value falls outside 0-100%"; exit 1; }
+          # Dips are called FROM this profile, so density must track its trough. Reversing
+          # either series, or joining it to the wrong chromosome, breaks this check while
+          # every count above still passes.
+          jq -e '.median_corr < -0.3' /tmp/tracks.json >/dev/null \
+            || { echo "dip density no longer tracks the methylation trough";
+                 jq ".median_corr" /tmp/tracks.json; exit 1; }
+
+          echo "--- the ancestry split of the dip track"
+          # The per-stratum tracks are a complete decomposition of the pooled one. The ETL
+          # asserts that at build time; re-asserting it here catches a bake where the
+          # ancestry join drifted from the histogram it adds up to.
+          jq -e '.strata == ["AFR","AMR","EAS","EUR","SAS"]' /tmp/tracks.json \
+            >/dev/null || { echo "unexpected ancestry strata"; jq ".strata" /tmp/tracks.json;
+                            exit 1; }
+          jq -e '(.density_anc | length) == 23 and (.nhap_anc | length) == 23' \
+            /tmp/tracks.json >/dev/null \
+            || { echo "the ancestry split does not cover 23 centromeres"; exit 1; }
+
+          # (1) the strata partition the haplotypes, on every chromosome
+          bad=$(jq -r '. as $t
+                       | [ $t.nhap_anc | to_entries[]
+                           | select((.value | add) != $t.chrom[.key].n_hap)
+                           | "\(.key): strata sum \(.value|add) vs n_hap \($t.chrom[.key].n_hap)" ]
+                       | .[]' /tmp/tracks.json)
+          [ -z "$bad" ] || { echo "ancestry strata do not partition the cohort:"; echo "$bad";
+                             exit 1; }
+
+          # (2) and they rebuild the pooled track, bin by bin. density is dips-per-haplotype
+          # rounded to 5dp, so counts/n_hap must land within 0.01 of it.
+          bad=$(jq -r '
+            . as $t
+            | [ $t.density_anc | to_entries[]
+                | .key as $c
+                | ($t.chrom[$c].n_hap) as $n
+                | [ range(0; 60) as $i
+                    | ([ $t.density_anc[$c][] | .[$i] ] | add) as $s
+                    | ($t.density[$c][$i] * $n) as $want
+                    | select(($s - $want | fabs) > 0.01)
+                    | "\($c) bin \($i): strata \($s) vs pooled \($want)" ]
+                | .[] ]
+            | .[]' /tmp/tracks.json)
+          [ -z "$bad" ] || { echo "the ancestry tracks do not rebuild the pooled track:";
+                             echo "$bad" | head -5; exit 1; }
+          echo "ancestry split partitions the cohort and rebuilds the pooled track on all 23"
+
+      # The catalog is 3.8 MB uncompressed and 0.4 MB gzipped, so the response header is
+      # asserted: gzip going missing costs a tenfold transfer with no other symptom.
+      - name: Assert gzip is applied to the catalog
+        run: |
+          set -euo pipefail
+          hdr=$(curl -fsS -H 'Accept-Encoding: gzip' -o /tmp/cat.gz -D - \
+                http://localhost:8080/data/catalog.json)
+          echo "$hdr" | grep -qi '^content-encoding: *gzip' \
+            || { echo "catalog.json was NOT gzipped:"; echo "$hdr"; exit 1; }
+          raw=$(curl -fsS http://localhost:8080/data/catalog.json | wc -c)
+          gz=$(wc -c < /tmp/cat.gz)
+          echo "catalog: ${raw} bytes raw, ${gz} gzipped ($(( 100 * gz / raw ))%)"
+          [ "$gz" -lt "$raw" ] || { echo "gzip did not reduce size"; exit 1; }
+
+      - name: Assert the container is not running as root
+        run: |
+          u=$(docker exec censv id -un)
+          echo "container user: $u"
+          [ "$u" != "root" ] || { echo "container runs as root"; exit 1; }
+
+      - name: Container logs
+        if: always()
+        run: docker logs censv || true
+
+      - name: Stop
+        if: always()
+        run: docker rm -f censv || true
+
+  payload:
+    name: the shipped file stays under its ceiling
+    runs-on: ubuntu-latest
+    # web/public/data is committed, so a runner can build the single file without the
+    # analysis tree. What it cannot do is run etl/checks/ - those read the extraction under
+    # /beegfs and run in infra/pages/build_local.sh instead, before every publish.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"          # the Dockerfile builds on node:22-alpine
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          cd web && npm ci --silent
+          pip install --quiet zopfli
+
+      - name: Build the front end and the single file
+        run: |
+          cd web && npm run build
+          cd .. && python web/tools/build_singlefile.py CenSV_offline.html
+
+      # A RATCHET, not a ceiling. Too big is a regression; far too small means the number was
+      # left behind by a size wave and has stopped constraining anything. Landing a wave means
+      # lowering CEILING in the same commit.
+      #
+      # 1,758,502 B at 2026-08-31, after zopfli, s2, s5 and s4.  Before them, 2,363,634 B.
+      # Lowered with each wave, in the wave's own commit - that is what the floor arm below
+      # is for.
+      - name: Assert the size
+        run: |
+          set -euo pipefail
+          CEILING=1780000
+          FLOOR=$(( CEILING * 85 / 100 ))
+          SIZE=$(stat -c %s CenSV_offline.html)
+          echo "shipped $SIZE B, ceiling $CEILING B, headroom $(( CEILING - SIZE )) B"
+          if [ "$SIZE" -gt "$CEILING" ]; then
+            echo "REGRESSION: the file grew $(( SIZE - CEILING )) B past its ceiling."
+            echo "If the growth is intended, raise CEILING here and say why in the commit."
+            exit 1
+          fi
+          if [ "$SIZE" -lt "$FLOOR" ]; then
+            echo "STALE CEILING: the file is $(( CEILING - SIZE )) B under a $CEILING B limit,"
+            echo "which no longer constrains anything. Lower CEILING to just above $SIZE."
+            exit 1
+          fi
+
+  terraform:
+    name: terraform fmt and validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Format check
+        run: terraform -chdir=infra fmt -check -recursive -diff
+
+      # Validates syntax, types and references, which is what can be checked without a
+      # backend or credentials.
+      - name: Validate
+        run: |
+          terraform -chdir=infra init -backend=false -input=false
+          terraform -chdir=infra validate
+          terraform -chdir=infra/bootstrap init -backend=false -input=false
+          terraform -chdir=infra/bootstrap validate

@@ -1,0 +1,7 @@
+# One CIDR per line. These are PERSONAL EXCEPTIONS, not institutional ranges - see the
+# comment in deploy_s3.sh. Delete a line and re-run the script to revoke it.
+#
+# Yikai's workstation. Emory VPN is split-tunnel, so the VPN does not put this machine
+# inside Emory's announced space; AWS sees the home ISP (VELOCITY, 168.92.224.0/19).
+# Residential address: expect this to change and need updating.
+168.92.228.134/32

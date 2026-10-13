@@ -1,0 +1,102 @@
+/* The haplotype layer. Kept out of style.css so the whole feature is addable and removable as
+   a set of new files, and so a rebase of the stylesheet never touches it.
+
+   Every custom property here is one tokens.css defines. The first pass used --surface, which
+   it does not - the name is --surface-1 - and an unresolved var() is silently dropped. */
+
+.hapsec { margin: 26px 0 0; }
+.hapsec h2 { font-size: 1.05rem; font-weight: 640; letter-spacing: -.01em; margin: 0 0 6px; }
+
+.hapsvg { display: block; max-width: 100%; height: auto; }
+
+/* the tree and its composition table side by side, stacking on a narrow viewport */
+.haprow { display: grid; grid-template-columns: minmax(0, 470px) minmax(0, 1fr); gap: 20px;
+  align-items: start; margin-top: 8px; }
+@media (max-width: 860px) { .haprow { grid-template-columns: 1fr; } }
+.hapside { position: sticky; top: 74px; }
+
+.haptab { border-collapse: collapse; width: 100%; font-size: .8125rem; }
+.haptab th, .haptab td { border-bottom: 1px solid var(--grid); padding: 4px 8px;
+  text-align: left; white-space: nowrap; }
+.haptab th { font-size: .6875rem; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text-muted); font-weight: 640; }
+.haptab td.num, .haptab th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.haptab.wide tbody tr { cursor: pointer; }
+.haptab.wide tbody tr:hover { background: var(--surface-1); }
+.haptab tbody tr.sel { background: var(--surface-1); box-shadow: inset 2px 0 0 var(--accent); }
+
+/* one box per ascAIRN cluster, so a pair in the table is the pair on the ribbon */
+.hapsws { display: inline-flex; gap: 2px; vertical-align: -1px; margin-right: 4px; }
+.hapsw { display: inline-block; width: 9px; height: 9px; border-radius: 2px;
+  border: 1px solid var(--grid); }
+
+/* The evidence count is the one cell in a clickable row that goes somewhere else, so it
+   wears the link colour and takes a hit area wider than a single digit. The margin gives
+   that width back to the layout, so the column sits where it sat. */
+.hapev { display: inline-block; padding: 2px 6px; margin: -2px -6px; font-weight: 640; }
+
+.hapsel { font: inherit; font-size: .8125rem; padding: 2px 6px; border: 1px solid var(--grid);
+  border-radius: var(--r-sm, 4px); background: var(--surface-1); color: var(--text-primary); }
+
+/* the two ways in, from the overview */
+.hapentry, .methentry { margin: 26px 0 6px; }
+.hapentry h2, .methentry h2 { font-size: 1.05rem; font-weight: 640; letter-spacing: -.01em; margin: 0 0 8px; }
+.hapentrys, .methentrys { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 720px) { .hapentrys { grid-template-columns: 1fr; } }
+
+.hapcta { display: block; padding: 10px 13px; border: 1px solid var(--grid);
+  border-left: 3px solid var(--accent); border-radius: var(--r-md, 6px);
+  background: var(--surface-1); text-decoration: none; color: var(--text-secondary); }
+.hapcta:hover { border-color: var(--accent); }
+/* the direct child only: the eyebrow inside carries its own <b> around each number, and
+   matching those too put every figure on a line of its own. */
+.hapcta > b { display: block; color: var(--text-primary); font-weight: 640;
+  margin-bottom: 2px; }
+.hapcta .eyebrow { display: block; }
+.hapcta .eyebrow b { color: var(--text-primary); }
+.hapcta.wide { margin: 18px 0 4px; }
+
+.hapline { font-size: .8125rem; color: var(--text-secondary); margin: 10px 0 0; }
+
+.crumbs.sub { margin: 2px 0 10px; font-size: .8125rem; }
+
+/* the ribbon key: the one ramp the rest of the site does not already explain */
+.hapkeys { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 0 8px;
+  font-size: .6875rem; color: var(--text-muted); }
+.hapkeyg { display: inline-flex; align-items: center; gap: 5px; }
+.hapkeyl { text-transform: uppercase; letter-spacing: .05em; font-weight: 640; }
+.hapkey { display: inline-flex; align-items: center; gap: 3px; }
+
+/* a sortable header is a button, so it is reachable by keyboard and announced as one */
+.haptab th { padding: 0; }
+.hapsort { font: inherit; font-size: .6875rem; text-transform: uppercase;
+  letter-spacing: .05em; font-weight: 640; color: var(--text-muted); background: none;
+  border: 0; padding: 4px 8px; width: 100%; text-align: inherit; cursor: pointer;
+  display: inline-flex; gap: 3px; align-items: baseline; }
+.haptab th.num .hapsort { justify-content: flex-end; }
+.hapsort:hover { color: var(--text-primary); }
+.hapsort.on { color: var(--text-primary); }
+.hapsort .arr { font-size: .75rem; line-height: 1; }
+
+/* The methylation table.
+   A row for an SV the scan returned nothing for stays legible rather than being greyed into
+   noise: it is a real answer to "was this tested", and the reader who sorted to find it
+   should not have to squint. The clearing mark is the one variant that passes the
+   whole-scan calibration, so it carries the only emphasis in the column. */
+.haptab tr.methclean td { color: var(--text-muted); }
+.haptab tr.methclean td:first-child { font-style: italic; }
+b.methclear { color: var(--ev-3); }
+
+/* Why a gate set an association aside, beside the association.
+   Array length carries the emphasis because it is the quantity the section argues about;
+   the others are the same weight as each other. Tokens are named, and a missing one would
+   drop the declaration rather than paint something arbitrary - verify_cdr checks the
+   rendered colour rather than counting the elements. */
+.rtag {
+  display: inline-block; margin-left: 6px; padding: 0 7px;
+  border: 1px solid var(--grid); border-radius: 999px;
+  font-size: .68rem; font-weight: 640; line-height: 1.5;
+  color: var(--text-secondary); background: var(--surface-1);
+  vertical-align: 1px; white-space: nowrap;
+}
+.rtag.strong { border-color: var(--ev-3); color: var(--ev-3); }
